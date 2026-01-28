@@ -1,0 +1,863 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fontara Medical - Distributor Agreement Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    
+    <!-- Include Navigator API Service -->
+    <script src="navigator-api-service.js"></script>
+    
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --color-primary: #0A2463;
+            --color-primary-light: #1E3A8A;
+            --color-secondary: #0891B2;
+            --color-accent: #06B6D4;
+            --color-success: #059669;
+            --color-warning: #D97706;
+            --color-danger: #DC2626;
+            --color-bg: #F8FAFC;
+            --color-surface: #FFFFFF;
+            --color-text: #1E293B;
+            --color-text-muted: #64748B;
+            --color-border: #E2E8F0;
+        }
+        body {
+            font-family: 'Archivo', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--color-bg);
+            color: var(--color-text);
+            line-height: 1.6;
+        }
+        .mono { font-family: 'JetBrains Mono', monospace; }
+        .card {
+            background: var(--color-surface);
+            border-radius: 12px;
+            border: 1px solid var(--color-border);
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            transition: all 0.3s ease;
+        }
+        .card:hover { box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.08); }
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 12px;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.025em;
+        }
+        .badge-exclusive { background: #DBEAFE; color: #1E40AF; }
+        .badge-non-exclusive { background: #E0F2FE; color: #0369A1; }
+        .badge-conditional { background: #FEF3C7; color: #92400E; }
+        .badge-low { background: #D1FAE5; color: #065F46; }
+        .badge-medium { background: #FED7AA; color: #92400E; }
+        .badge-high { background: #FEE2E2; color: #991B1B; }
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 500;
+            font-size: 0.875rem;
+            transition: all 0.2s ease;
+            cursor: pointer;
+            border: none;
+            outline: none;
+        }
+        .btn-primary {
+            background: var(--color-primary);
+            color: white;
+        }
+        .btn-primary:hover {
+            background: var(--color-primary-light);
+            transform: translateY(-1px);
+        }
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .btn-secondary {
+            background: var(--color-surface);
+            color: var(--color-text);
+            border: 1px solid var(--color-border);
+        }
+        .btn-secondary:hover { background: var(--color-bg); }
+        .sidebar {
+            position: fixed;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            width: 280px;
+            background: var(--color-surface);
+            border-right: 1px solid var(--color-border);
+            z-index: 100;
+            overflow-y: auto;
+        }
+        .main-content {
+            margin-left: 280px;
+            min-height: 100vh;
+            padding: 32px;
+        }
+        .chat-panel {
+            position: fixed;
+            right: 0;
+            top: 0;
+            bottom: 0;
+            width: 400px;
+            background: var(--color-surface);
+            border-left: 1px solid var(--color-border);
+            display: flex;
+            flex-direction: column;
+            transform: translateX(100%);
+            transition: transform 0.3s ease;
+            z-index: 200;
+        }
+        .chat-panel.open { transform: translateX(0); }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-in { animation: slideIn 0.4s ease-out; }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .spinning {
+            animation: spin 1s linear infinite;
+        }
+        .progress-bar {
+            height: 4px;
+            background: var(--color-border);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--color-secondary), var(--color-accent));
+            transition: width 0.3s ease;
+        }
+        .connection-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        .connection-status.connected {
+            background: #D1FAE5;
+            color: #065F46;
+        }
+        .connection-status.disconnected {
+            background: #FEE2E2;
+            color: #991B1B;
+        }
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        .modal-content {
+            background: var(--color-surface);
+            border-radius: 12px;
+            padding: 32px;
+            max-width: 500px;
+            width: 90%;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+        
+        // Initialize Navigator Service
+        const navigatorService = new NavigatorAPIService();
+        
+        // Configuration (in production, these would come from environment variables)
+        const DOCUSIGN_CONFIG = {
+            clientId: 'YOUR_CLIENT_ID', // Replace with actual client ID
+            clientSecret: 'YOUR_CLIENT_SECRET', // Replace with actual client secret
+            redirectUri: window.location.origin + '/oauth/callback'
+        };
+
+        function Dashboard() {
+            const [view, setView] = useState('dashboard');
+            const [chatOpen, setChatOpen] = useState(false);
+            const [connected, setConnected] = useState(false);
+            const [syncing, setSyncing] = useState(false);
+            const [syncProgress, setSyncProgress] = useState(0);
+            const [lastSync, setLastSync] = useState(null);
+            const [agreements, setAgreements] = useState([]);
+            const [conflicts, setConflicts] = useState([]);
+            const [messages, setMessages] = useState([
+                { role: 'assistant', content: 'Hello! I\'m your AI assistant. Connect to DocuSign Navigator to analyze your distributor agreements.' }
+            ]);
+            const [input, setInput] = useState('');
+            const [showConnectModal, setShowConnectModal] = useState(false);
+
+            // Load cached data on mount
+            useEffect(() => {
+                const cached = navigatorService.getCachedAgreements();
+                if (cached.length > 0) {
+                    setAgreements(cached);
+                    setConnected(true);
+                    setLastSync(navigatorService.getLastSyncTime());
+                }
+                const cachedConflicts = navigatorService.getCachedConflicts();
+                if (cachedConflicts) {
+                    setConflicts(cachedConflicts);
+                }
+            }, []);
+
+            // Handle OAuth callback
+            useEffect(() => {
+                const params = new URLSearchParams(window.location.search);
+                const code = params.get('code');
+                if (code) {
+                    handleOAuthCallback(code);
+                }
+            }, []);
+
+            const handleConnect = () => {
+                navigatorService.initiateOAuth(DOCUSIGN_CONFIG.clientId, DOCUSIGN_CONFIG.redirectUri);
+            };
+
+            const handleOAuthCallback = async (code) => {
+                const result = await navigatorService.exchangeCodeForToken(
+                    code,
+                    DOCUSIGN_CONFIG.clientId,
+                    DOCUSIGN_CONFIG.clientSecret,
+                    DOCUSIGN_CONFIG.redirectUri
+                );
+                
+                if (result.success) {
+                    setConnected(true);
+                    setShowConnectModal(false);
+                    // Clear code from URL
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                    // Trigger initial sync
+                    handleSync();
+                } else {
+                    alert('Connection failed: ' + result.error);
+                }
+            };
+
+            const handleSync = async () => {
+                if (syncing) return;
+                
+                setSyncing(true);
+                setSyncProgress(0);
+                
+                const result = await navigatorService.syncAgreements(
+                    DOCUSIGN_CONFIG.clientId,
+                    DOCUSIGN_CONFIG.clientSecret,
+                    (progress) => {
+                        setSyncProgress(progress.progress || 0);
+                    }
+                );
+                
+                setSyncing(false);
+                
+                if (result.success) {
+                    const agreements = navigatorService.getCachedAgreements();
+                    setAgreements(agreements);
+                    setConflicts(result.conflicts || []);
+                    setLastSync(result.lastSyncTime);
+                    
+                    // Add success message to chat
+                    addMessage('assistant', `✅ Sync complete! Retrieved ${result.count} agreements in ${result.syncTime.toFixed(1)}s. Found ${result.conflicts?.length || 0} potential conflicts.`);
+                } else {
+                    alert('Sync failed: ' + result.error);
+                    if (result.usingCache) {
+                        addMessage('assistant', '⚠️ Using cached data due to sync failure. Data may be stale.');
+                    }
+                }
+            };
+
+            const handleDisconnect = () => {
+                if (confirm('Are you sure you want to disconnect from Navigator? All cached data will be cleared.')) {
+                    navigatorService.disconnect();
+                    setConnected(false);
+                    setAgreements([]);
+                    setConflicts([]);
+                    setLastSync(null);
+                    setMessages([
+                        { role: 'assistant', content: 'Disconnected from Navigator. Connect again to access your agreements.' }
+                    ]);
+                }
+            };
+
+            const addMessage = (role, content) => {
+                setMessages(prev => [...prev, { role, content }]);
+            };
+
+            const handleSend = async () => {
+                if (!input.trim()) return;
+                
+                const userMsg = input;
+                addMessage('user', userMsg);
+                setInput('');
+                
+                // Simulate AI response with MCP integration
+                // In production, this would call the actual MCP server
+                const response = await simulateAIResponse(userMsg, agreements);
+                addMessage('assistant', response);
+            };
+
+            const kpis = {
+                active: agreements.filter(a => a.status === 'Active').length,
+                territories: [...new Set(agreements.flatMap(a => a.territoryCountries))].length,
+                expiring: agreements.filter(a => a.daysUntilExpiration <= 90 && a.daysUntilExpiration > 0).length,
+                commitment: agreements.reduce((sum, a) => sum + (a.currentYearCommitment || 0), 0)
+            };
+
+            return (
+                <div style={{ display: 'flex' }}>
+                    <Sidebar view={view} setView={setView} />
+                    <div className="main-content" style={{ paddingRight: chatOpen ? '432px' : '32px' }}>
+                        <Header 
+                            connected={connected}
+                            syncing={syncing}
+                            syncProgress={syncProgress}
+                            lastSync={lastSync}
+                            onConnect={() => setShowConnectModal(true)}
+                            onSync={handleSync}
+                            onDisconnect={handleDisconnect}
+                            onChatToggle={() => setChatOpen(!chatOpen)}
+                            chatOpen={chatOpen}
+                        />
+                        
+                        {!connected ? (
+                            <ConnectPrompt onConnect={() => setShowConnectModal(true)} />
+                        ) : (
+                            <>
+                                {view === 'dashboard' && <DashboardView kpis={kpis} data={agreements} conflicts={conflicts} />}
+                                {view === 'agreements' && <AgreementsView data={agreements} />}
+                                {view === 'analytics' && <AnalyticsView data={agreements} />}
+                            </>
+                        )}
+                    </div>
+                    <ChatPanel 
+                        open={chatOpen} 
+                        messages={messages} 
+                        input={input}
+                        setInput={setInput}
+                        onSend={handleSend}
+                        onClose={() => setChatOpen(false)}
+                        connected={connected}
+                    />
+                    
+                    {showConnectModal && (
+                        <ConnectModal 
+                            onConnect={handleConnect}
+                            onClose={() => setShowConnectModal(false)}
+                        />
+                    )}
+                </div>
+            );
+        }
+
+        function Sidebar({ view, setView }) {
+            const items = [
+                { id: 'dashboard', label: 'Dashboard', icon: '📊' },
+                { id: 'agreements', label: 'Agreements', icon: '📄' },
+                { id: 'analytics', label: 'Analytics', icon: '📈' }
+            ];
+            
+            return (
+                <div className="sidebar">
+                    <div style={{ padding: '24px', borderBottom: '1px solid var(--color-border)' }}>
+                        <div style={{ fontSize: '1.5rem', fontWeight: '700', color: 'var(--color-primary)' }}>
+                            Fontara Medical
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
+                            Distributor Dashboard
+                        </div>
+                    </div>
+                    <nav style={{ padding: '16px 0' }}>
+                        {items.map(item => (
+                            <div
+                                key={item.id}
+                                onClick={() => setView(item.id)}
+                                style={{
+                                    padding: '12px 24px',
+                                    cursor: 'pointer',
+                                    fontWeight: view === item.id ? '600' : '400',
+                                    color: view === item.id ? 'var(--color-primary)' : 'var(--color-text-muted)',
+                                    background: view === item.id ? 'var(--color-bg)' : 'transparent',
+                                    borderLeft: view === item.id ? '3px solid var(--color-primary)' : '3px solid transparent'
+                                }}
+                            >
+                                {item.icon} {item.label}
+                            </div>
+                        ))}
+                    </nav>
+                </div>
+            );
+        }
+
+        function Header({ connected, syncing, syncProgress, lastSync, onConnect, onSync, onDisconnect, onChatToggle, chatOpen }) {
+            return (
+                <div style={{ marginBottom: '32px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                        <div>
+                            <h1 style={{ fontSize: '2rem', fontWeight: '700' }}>Agreement Dashboard</h1>
+                        </div>
+                        <button onClick={onChatToggle} className="btn btn-primary">
+                            🤖 {chatOpen ? 'Close' : 'Open'} AI Assistant
+                        </button>
+                    </div>
+                    
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+                        <div className={`connection-status ${connected ? 'connected' : 'disconnected'}`}>
+                            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: connected ? '#059669' : '#DC2626' }}></span>
+                            {connected ? 'Connected to Navigator' : 'Not Connected'}
+                        </div>
+                        
+                        {connected && lastSync && (
+                            <div className="mono" style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)' }}>
+                                Last sync: {new Date(lastSync).toLocaleString()}
+                            </div>
+                        )}
+                        
+                        {connected && (
+                            <>
+                                <button 
+                                    onClick={onSync} 
+                                    className="btn btn-secondary"
+                                    disabled={syncing}
+                                    style={{ padding: '6px 12px' }}
+                                >
+                                    <span className={syncing ? 'spinning' : ''}>🔄</span>
+                                    {syncing ? 'Syncing...' : 'Sync Now'}
+                                </button>
+                                <button 
+                                    onClick={onDisconnect} 
+                                    className="btn btn-secondary"
+                                    style={{ padding: '6px 12px', color: 'var(--color-danger)' }}
+                                >
+                                    Disconnect
+                                </button>
+                            </>
+                        )}
+                        
+                        {!connected && (
+                            <button onClick={onConnect} className="btn btn-primary" style={{ padding: '6px 12px' }}>
+                                Connect Navigator
+                            </button>
+                        )}
+                    </div>
+                    
+                    {syncing && (
+                        <div style={{ marginTop: '12px' }}>
+                            <div className="progress-bar">
+                                <div className="progress-fill" style={{ width: `${syncProgress}%` }}></div>
+                            </div>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginTop: '4px' }}>
+                                {syncProgress}% complete
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        function ConnectPrompt({ onConnect }) {
+            return (
+                <div className="card animate-in" style={{ padding: '48px', textAlign: 'center', maxWidth: '600px', margin: '64px auto' }}>
+                    <div style={{ fontSize: '4rem', marginBottom: '24px' }}>🔗</div>
+                    <h2 style={{ fontSize: '1.5rem', fontWeight: '700', marginBottom: '16px' }}>
+                        Connect to DocuSign Navigator
+                    </h2>
+                    <p style={{ color: 'var(--color-text-muted)', marginBottom: '32px', lineHeight: '1.6' }}>
+                        Connect your DocuSign Navigator account to view and analyze your distributor agreements.
+                        Your data is synced securely and stored locally.
+                    </p>
+                    <button onClick={onConnect} className="btn btn-primary" style={{ fontSize: '1rem', padding: '12px 24px' }}>
+                        Connect Navigator Account
+                    </button>
+                    <div style={{ marginTop: '24px', fontSize: '0.875rem', color: 'var(--color-text-muted)' }}>
+                        🔒 Secure OAuth 2.0 authentication
+                    </div>
+                </div>
+            );
+        }
+
+        function ConnectModal({ onConnect, onClose }) {
+            return (
+                <div className="modal" onClick={onClose}>
+                    <div className="modal-content" onClick={e => e.stopPropagation()}>
+                        <h2 style={{ fontSize: '1.5rem', fontWeight: '700', marginBottom: '16px' }}>
+                            Connect to Navigator
+                        </h2>
+                        <p style={{ color: 'var(--color-text-muted)', marginBottom: '24px' }}>
+                            You'll be redirected to DocuSign to authorize this application. After authorization,
+                            you'll be returned here to sync your distributor agreements.
+                        </p>
+                        <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                            <button onClick={onClose} className="btn btn-secondary">
+                                Cancel
+                            </button>
+                            <button onClick={onConnect} className="btn btn-primary">
+                                Continue to DocuSign
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // [Rest of the components remain the same as before: DashboardView, AgreementsView, AnalyticsView, ChatPanel, etc.]
+        // Continuing from previous file...
+        
+        function DashboardView({ kpis, data, conflicts }) {
+            return (
+                <div className="animate-in">
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '20px', marginBottom: '32px' }}>
+                        <KPICard title="Active Agreements" value={kpis.active} icon="✅" />
+                        <KPICard title="Territories Covered" value={kpis.territories} icon="🌍" />
+                        <KPICard title="Expiring in 90 Days" value={kpis.expiring} icon="⚠️" warning={kpis.expiring > 0} />
+                        <KPICard title="Total Commitment" value={`$${(kpis.commitment/1000000).toFixed(1)}M`} icon="💰" />
+                        <KPICard title="Conflicts Detected" value={conflicts.length} icon="🚨" warning={conflicts.length > 0} />
+                    </div>
+                    
+                    {conflicts.length > 0 && (
+                        <div className="card" style={{ padding: '24px', marginBottom: '24px', background: '#FEE2E2', border: '1px solid #FCA5A5' }}>
+                            <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '12px', color: '#991B1B' }}>
+                                🚨 {conflicts.length} Territory/Product Conflict{conflicts.length > 1 ? 's' : ''} Detected
+                            </h3>
+                            {conflicts.slice(0, 3).map((conflict, i) => (
+                                <div key={i} style={{ fontSize: '0.875rem', marginBottom: '8px' }}>
+                                    <strong>{conflict.agreement1.title}</strong> and <strong>{conflict.agreement2.title}</strong>: 
+                                    Overlap in {conflict.overlappingTerritories.join(', ')} for {conflict.overlappingProducts.join(', ')}
+                                </div>
+                            ))}
+                            {conflicts.length > 3 && (
+                                <div style={{ fontSize: '0.875rem', color: '#991B1B', marginTop: '8px' }}>
+                                    +{conflicts.length - 3} more conflicts
+                                </div>
+                            )}
+                        </div>
+                    )}
+                    
+                    <div className="card" style={{ padding: '24px', marginBottom: '24px' }}>
+                        <h2 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '16px' }}>
+                            Recent Agreements
+                        </h2>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px' }}>
+                            {data.slice(0, 6).map(agreement => (
+                                <AgreementCard key={agreement.id} agreement={agreement} />
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        function KPICard({ title, value, icon, warning }) {
+            return (
+                <div className="card" style={{ padding: '24px', position: 'relative' }}>
+                    <div style={{ fontSize: '2rem', opacity: 0.2, position: 'absolute', right: '16px', top: '16px' }}>
+                        {icon}
+                    </div>
+                    <div style={{ fontSize: '0.75rem', fontWeight: '600', textTransform: 'uppercase', color: 'var(--color-text-muted)', marginBottom: '8px' }}>
+                        {title}
+                    </div>
+                    <div style={{ fontSize: '2rem', fontWeight: '700', color: 'var(--color-primary)' }}>
+                        {value}
+                    </div>
+                    {warning && (
+                        <div style={{ fontSize: '0.75rem', color: 'var(--color-warning)', marginTop: '4px' }}>
+                            ⚠️ Requires attention
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        function AgreementCard({ agreement }) {
+            return (
+                <div className="card" style={{ padding: '16px' }}>
+                    <div style={{ fontWeight: '600', marginBottom: '8px' }}>{agreement.title}</div>
+                    <div style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)', marginBottom: '8px' }}>
+                        {agreement.distributorLegalName}
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' }}>
+                        <span className={`badge badge-${agreement.exclusivityStatus.toLowerCase().replace(' ', '-')}`}>
+                            {agreement.exclusivityStatus}
+                        </span>
+                        <span className={`badge badge-${agreement.aiRiskScore.toLowerCase()}`}>
+                            {agreement.aiRiskScore}
+                        </span>
+                    </div>
+                    {agreement.navigatorUrl && (
+                        <a href={agreement.navigatorUrl} target="_blank" className="btn btn-secondary" style={{ width: '100%', justifyContent: 'center', fontSize: '0.75rem', padding: '8px' }}>
+                            View in Navigator →
+                        </a>
+                    )}
+                </div>
+            );
+        }
+
+        function AgreementsView({ data }) {
+            return (
+                <div className="animate-in">
+                    <h2 style={{ fontSize: '1.5rem', fontWeight: '700', marginBottom: '24px' }}>
+                        All Agreements ({data.length})
+                    </h2>
+                    <div className="card" style={{ overflow: 'hidden' }}>
+                        <table style={{ width: '100%' }}>
+                            <thead>
+                                <tr style={{ background: 'var(--color-bg)' }}>
+                                    <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', textTransform: 'uppercase' }}>Agreement</th>
+                                    <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', textTransform: 'uppercase' }}>Territory</th>
+                                    <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', textTransform: 'uppercase' }}>Exclusivity</th>
+                                    <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', textTransform: 'uppercase' }}>Performance</th>
+                                    <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', textTransform: 'uppercase' }}>Risk</th>
+                                    <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', textTransform: 'uppercase' }}>Expiration</th>
+                                    <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', textTransform: 'uppercase' }}>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {data.map(item => (
+                                    <tr key={item.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
+                                        <td style={{ padding: '16px' }}>
+                                            <div style={{ fontWeight: '600' }}>{item.distributorLegalName}</div>
+                                            <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>{item.title}</div>
+                                        </td>
+                                        <td style={{ padding: '16px' }}>
+                                            {item.territoryCountries.slice(0, 2).map(t => (
+                                                <span key={t} className="badge" style={{ background: 'var(--color-bg)', color: 'var(--color-text)', marginRight: '4px' }}>
+                                                    {t}
+                                                </span>
+                                            ))}
+                                        </td>
+                                        <td style={{ padding: '16px' }}>
+                                            <span className={`badge badge-${item.exclusivityStatus.toLowerCase().replace(' ', '-')}`}>
+                                                {item.exclusivityStatus}
+                                            </span>
+                                        </td>
+                                        <td style={{ padding: '16px' }}>
+                                            <div style={{ fontSize: '1rem', fontWeight: '600' }}>{item.currentPerformance}%</div>
+                                        </td>
+                                        <td style={{ padding: '16px' }}>
+                                            <span className={`badge badge-${item.aiRiskScore.toLowerCase()}`}>{item.aiRiskScore}</span>
+                                        </td>
+                                        <td style={{ padding: '16px' }}>
+                                            <div className="mono" style={{ fontSize: '0.875rem' }}>{item.expirationDate}</div>
+                                            <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
+                                                {item.daysUntilExpiration} days
+                                            </div>
+                                        </td>
+                                        <td style={{ padding: '16px' }}>
+                                            {item.navigatorUrl ? (
+                                                <a href={item.navigatorUrl} target="_blank" className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '0.75rem' }}>
+                                                    View →
+                                                </a>
+                                            ) : (
+                                                <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>No link</span>
+                                            )}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            );
+        }
+
+        function AnalyticsView({ data }) {
+            return (
+                <div className="animate-in">
+                    <h2 style={{ fontSize: '1.5rem', fontWeight: '700', marginBottom: '24px' }}>Analytics</h2>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+                        <div className="card" style={{ padding: '24px' }}>
+                            <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '16px' }}>
+                                Performance Distribution
+                            </h3>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                <PerformanceBar label="Above 100%" count={data.filter(a => a.currentPerformance >= 100).length} total={data.length} color="var(--color-success)" />
+                                <PerformanceBar label="90-100%" count={data.filter(a => a.currentPerformance >= 90 && a.currentPerformance < 100).length} total={data.length} color="var(--color-secondary)" />
+                                <PerformanceBar label="85-90%" count={data.filter(a => a.currentPerformance >= 85 && a.currentPerformance < 90).length} total={data.length} color="var(--color-warning)" />
+                                <PerformanceBar label="Below 85%" count={data.filter(a => a.currentPerformance < 85).length} total={data.length} color="var(--color-danger)" />
+                            </div>
+                        </div>
+                        
+                        <div className="card" style={{ padding: '24px' }}>
+                            <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '16px' }}>
+                                Risk Distribution
+                            </h3>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                <PerformanceBar label="Low Risk" count={data.filter(a => a.aiRiskScore === 'Low').length} total={data.length} color="var(--color-success)" />
+                                <PerformanceBar label="Medium Risk" count={data.filter(a => a.aiRiskScore === 'Medium').length} total={data.length} color="var(--color-warning)" />
+                                <PerformanceBar label="High Risk" count={data.filter(a => a.aiRiskScore === 'High').length} total={data.length} color="var(--color-danger)" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        function PerformanceBar({ label, count, total, color }) {
+            const percentage = total > 0 ? (count / total) * 100 : 0;
+            return (
+                <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: '0.875rem' }}>
+                        <span>{label}</span>
+                        <span style={{ fontWeight: '600' }}>{count} ({percentage.toFixed(0)}%)</span>
+                    </div>
+                    <div className="progress-bar" style={{ height: '8px' }}>
+                        <div style={{ width: `${percentage}%`, height: '100%', background: color, borderRadius: '2px' }}></div>
+                    </div>
+                </div>
+            );
+        }
+
+        function ChatPanel({ open, messages, input, setInput, onSend, onClose, connected }) {
+            return (
+                <div className={`chat-panel ${open ? 'open' : ''}`}>
+                    <div style={{ padding: '24px', borderBottom: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                            <div style={{ fontWeight: '700', fontSize: '1.125rem' }}>🤖 AI Assistant</div>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
+                                {connected ? 'Connected to Navigator MCP' : 'Not connected'}
+                            </div>
+                        </div>
+                        <button onClick={onClose} className="btn btn-secondary" style={{ padding: '8px' }}>✕</button>
+                    </div>
+                    
+                    <div style={{ flex: 1, overflowY: 'auto', padding: '24px' }}>
+                        {messages.map((msg, i) => (
+                            <div key={i} style={{ 
+                                marginBottom: '16px', 
+                                display: 'flex', 
+                                justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start'
+                            }}>
+                                <div style={{ 
+                                    maxWidth: '80%', 
+                                    padding: '12px 16px', 
+                                    borderRadius: '12px',
+                                    background: msg.role === 'user' ? 'var(--color-primary)' : 'var(--color-bg)',
+                                    color: msg.role === 'user' ? 'white' : 'var(--color-text)'
+                                }}>
+                                    {msg.content}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                    
+                    <div style={{ padding: '16px', borderTop: '1px solid var(--color-border)' }}>
+                        {connected ? (
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                                <input
+                                    type="text"
+                                    value={input}
+                                    onChange={(e) => setInput(e.target.value)}
+                                    onKeyPress={(e) => e.key === 'Enter' && onSend()}
+                                    placeholder="Ask about agreements..."
+                                    style={{ 
+                                        flex: 1, 
+                                        padding: '10px', 
+                                        borderRadius: '8px', 
+                                        border: '1px solid var(--color-border)',
+                                        outline: 'none'
+                                    }}
+                                />
+                                <button onClick={onSend} className="btn btn-primary">Send</button>
+                            </div>
+                        ) : (
+                            <div style={{ textAlign: 'center', padding: '16px', color: 'var(--color-text-muted)' }}>
+                                Connect to Navigator to use AI assistant
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        // Simulate AI response using MCP tools
+        async function simulateAIResponse(query, agreements) {
+            const q = query.toLowerCase();
+            
+            // Simulate navigator_search_agreements tool
+            if (q.includes('expir') || q.includes('renew')) {
+                const expiring = agreements.filter(a => a.daysUntilExpiration <= 180 && a.daysUntilExpiration > 0);
+                if (expiring.length === 0) {
+                    return 'No agreements expiring in the next 6 months.';
+                }
+                return `I found ${expiring.length} agreements expiring in the next 6 months:\n\n${expiring.map(a => 
+                    `• ${a.title} (${a.territoryCountries[0]}): ${a.daysUntilExpiration} days until expiration\n  Renewal deadline: ${a.nonRenewalDeadline} (${a.daysUntilDeadline} days)`
+                ).join('\n\n')}\n\nWould you like details on any of these?`;
+            }
+            
+            // Simulate navigator_get_agreement_status tool
+            if (q.includes('performance') || q.includes('threshold') || q.includes('below')) {
+                const low = agreements.filter(a => a.currentPerformance < a.minimumPerformanceThreshold);
+                if (low.length === 0) {
+                    return '✅ All agreements are meeting or exceeding performance thresholds!';
+                }
+                return `⚠️ Found ${low.length} agreement(s) below threshold:\n\n${low.map(a => 
+                    `• ${a.title}: ${a.currentPerformance}% (threshold: ${a.minimumPerformanceThreshold}%)\n  Risk: ${a.aiRiskScore}`
+                ).join('\n\n')}\n\nI recommend scheduling performance reviews for these distributors.`;
+            }
+            
+            // Simulate navigator_analyze_portfolio tool
+            if (q.includes('risk') || q.includes('alert') || q.includes('high risk')) {
+                const high = agreements.filter(a => a.aiRiskScore === 'High');
+                if (high.length === 0) {
+                    return 'No high-risk agreements detected. All agreements are performing well.';
+                }
+                return `🚨 ${high.length} high-risk agreement(s) requiring attention:\n\n${high.map(a => 
+                    `• ${a.title}\n  Performance: ${a.currentPerformance}% | Expires in: ${a.daysUntilExpiration} days`
+                ).join('\n\n')}`;
+            }
+            
+            // Simulate navigator_compare_agreements tool
+            if (q.includes('compare')) {
+                if (agreements.length >= 2) {
+                    const a1 = agreements[0];
+                    const a2 = agreements[1];
+                    return `Comparing ${a1.title} vs ${a2.title}:\n\nPerformance: ${a1.currentPerformance}% vs ${a2.currentPerformance}%\nExclusivity: ${a1.exclusivityStatus} vs ${a2.exclusivityStatus}\nRisk: ${a1.aiRiskScore} vs ${a2.aiRiskScore}\n\nWould you like more details?`;
+                }
+            }
+            
+            // Simulate navigator_get_document_link tool
+            if (q.includes('view') || q.includes('link') || q.includes('navigator')) {
+                const withLinks = agreements.filter(a => a.navigatorUrl);
+                if (withLinks.length > 0) {
+                    const a = withLinks[0];
+                    return `You can view ${a.title} in Navigator here: ${a.navigatorUrl}`;
+                }
+                return 'No Navigator document links available for these agreements.';
+            }
+            
+            return `I can help you analyze your ${agreements.length} distributor agreements. Try asking about:\n• Expiring agreements\n• Performance issues\n• Risk assessments\n• Territory comparisons\n• Specific agreement details`;
+        }
+
+        ReactDOM.render(<Dashboard />, document.getElementById('root'));
+    </script>
+</body>
+</html>
