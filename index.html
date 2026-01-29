@@ -262,224 +262,32 @@
             };
 
             const handleSync = async () => {
-                if (syncing) return;
-                
-                setSyncing(true);
-                setSyncProgress(0);
-                
-                const result = await navigatorService.syncAgreements(
-                    DOCUSIGN_CONFIG.clientId,
-                    DOCUSIGN_CONFIG.clientSecret,
-                    (progress) => {
-                        setSyncProgress(progress.progress || 0);
-                    }
-                );
-                
-                setSyncing(false);
-                
-                if (result.success) {
-                    const agreements = navigatorService.getCachedAgreements();
-                    setAgreements(agreements);
-                    setConflicts(result.conflicts || []);
-                    setLastSync(result.lastSyncTime);
-                    
-                    // Add success message to chat
-                    addMessage('assistant', `✅ Sync complete! Retrieved ${result.count} agreements in ${result.syncTime.toFixed(1)}s. Found ${result.conflicts?.length || 0} potential conflicts.`);
-                } else {
-                    alert('Sync failed: ' + result.error);
-                    if (result.usingCache) {
-                        addMessage('assistant', '⚠️ Using cached data due to sync failure. Data may be stale.');
-                    }
-                }
-            };
-
-            const handleDisconnect = () => {
-                if (confirm('Are you sure you want to disconnect from Navigator? All cached data will be cleared.')) {
-                    navigatorService.disconnect();
-                    setConnected(false);
-                    setAgreements([]);
-                    setConflicts([]);
-                    setLastSync(null);
-                    setMessages([
-                        { role: 'assistant', content: 'Disconnected from Navigator. Connect again to access your agreements.' }
-                    ]);
-                }
-            };
-
-            const addMessage = (role, content) => {
-                setMessages(prev => [...prev, { role, content }]);
-            };
-
-            const handleSend = async () => {
-                if (!input.trim()) return;
-                
-                const userMsg = input;
-                addMessage('user', userMsg);
-                setInput('');
-                
-                // Simulate AI response with MCP integration
-                // In production, this would call the actual MCP server
-                const response = await simulateAIResponse(userMsg, agreements);
-                addMessage('assistant', response);
-            };
-
-            const kpis = {
-                active: agreements.filter(a => a.status === 'Active').length,
-                territories: [...new Set(agreements.flatMap(a => a.territoryCountries))].length,
-                expiring: agreements.filter(a => a.daysUntilExpiration <= 90 && a.daysUntilExpiration > 0).length,
-                commitment: agreements.reduce((sum, a) => sum + (a.currentYearCommitment || 0), 0)
-            };
-
-            return (
-                <div style={{ display: 'flex' }}>
-                    <Sidebar view={view} setView={setView} />
-                    <div className="main-content" style={{ paddingRight: chatOpen ? '432px' : '32px' }}>
-                        <Header 
-                            connected={connected}
-                            syncing={syncing}
-                            syncProgress={syncProgress}
-                            lastSync={lastSync}
-                            onConnect={() => setShowConnectModal(true)}
-                            onSync={handleSync}
-                            onDisconnect={handleDisconnect}
-                            onChatToggle={() => setChatOpen(!chatOpen)}
-                            chatOpen={chatOpen}
-                        />
-                        
-                        {!connected ? (
-                            <ConnectPrompt onConnect={() => setShowConnectModal(true)} />
-                        ) : (
-                            <>
-                                {view === 'dashboard' && <DashboardView kpis={kpis} data={agreements} conflicts={conflicts} />}
-                                {view === 'agreements' && <AgreementsView data={agreements} />}
-                                {view === 'analytics' && <AnalyticsView data={agreements} />}
-                            </>
-                        )}
-                    </div>
-                    <ChatPanel 
-                        open={chatOpen} 
-                        messages={messages} 
-                        input={input}
-                        setInput={setInput}
-                        onSend={handleSend}
-                        onClose={() => setChatOpen(false)}
-                        connected={connected}
-                    />
-                    
-                    {showConnectModal && (
-                        <ConnectModal 
-                            onConnect={handleConnect}
-                            onClose={() => setShowConnectModal(false)}
-                        />
-                    )}
-                </div>
-            );
+    if (syncing) return;
+    
+    setSyncing(true);
+    setSyncProgress(0);
+    
+    const result = await navigatorService.syncAgreements((progress) => {
+        setSyncProgress(progress.progress || 0);
+    });
+    
+    setSyncing(false);
+    
+    if (result.success) {
+        const agreements = navigatorService.getCachedAgreements();
+        setAgreements(agreements);
+        setConflicts(result.conflicts || []);
+        setLastSync(result.lastSyncTime);
+        
+        // Add success message to chat
+        addMessage('assistant', `✅ Sync complete! Retrieved ${result.count} agreements in ${result.syncTime.toFixed(1)}s. Found ${result.conflicts?.length || 0} potential conflicts.`);
+    } else {
+        alert('Sync failed: ' + result.error);
+        if (result.usingCache) {
+            addMessage('assistant', '⚠️ Using cached data due to sync failure. Data may be stale.');
         }
-
-        function Sidebar({ view, setView }) {
-            const items = [
-                { id: 'dashboard', label: 'Dashboard', icon: '📊' },
-                { id: 'agreements', label: 'Agreements', icon: '📄' },
-                { id: 'analytics', label: 'Analytics', icon: '📈' }
-            ];
-            
-            return (
-                <div className="sidebar">
-                    <div style={{ padding: '24px', borderBottom: '1px solid var(--color-border)' }}>
-                        <div style={{ fontSize: '1.5rem', fontWeight: '700', color: 'var(--color-primary)' }}>
-                            Fontara Medical
-                        </div>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
-                            Distributor Dashboard
-                        </div>
-                    </div>
-                    <nav style={{ padding: '16px 0' }}>
-                        {items.map(item => (
-                            <div
-                                key={item.id}
-                                onClick={() => setView(item.id)}
-                                style={{
-                                    padding: '12px 24px',
-                                    cursor: 'pointer',
-                                    fontWeight: view === item.id ? '600' : '400',
-                                    color: view === item.id ? 'var(--color-primary)' : 'var(--color-text-muted)',
-                                    background: view === item.id ? 'var(--color-bg)' : 'transparent',
-                                    borderLeft: view === item.id ? '3px solid var(--color-primary)' : '3px solid transparent'
-                                }}
-                            >
-                                {item.icon} {item.label}
-                            </div>
-                        ))}
-                    </nav>
-                </div>
-            );
-        }
-
-        function Header({ connected, syncing, syncProgress, lastSync, onConnect, onSync, onDisconnect, onChatToggle, chatOpen }) {
-            return (
-                <div style={{ marginBottom: '32px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                        <div>
-                            <h1 style={{ fontSize: '2rem', fontWeight: '700' }}>Agreement Dashboard</h1>
-                        </div>
-                        <button onClick={onChatToggle} className="btn btn-primary">
-                            🤖 {chatOpen ? 'Close' : 'Open'} AI Assistant
-                        </button>
-                    </div>
-                    
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
-                        <div className={`connection-status ${connected ? 'connected' : 'disconnected'}`}>
-                            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: connected ? '#059669' : '#DC2626' }}></span>
-                            {connected ? 'Connected to Navigator' : 'Not Connected'}
-                        </div>
-                        
-                        {connected && lastSync && (
-                            <div className="mono" style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)' }}>
-                                Last sync: {new Date(lastSync).toLocaleString()}
-                            </div>
-                        )}
-                        
-                        {connected && (
-                            <>
-                                <button 
-                                    onClick={onSync} 
-                                    className="btn btn-secondary"
-                                    disabled={syncing}
-                                    style={{ padding: '6px 12px' }}
-                                >
-                                    <span className={syncing ? 'spinning' : ''}>🔄</span>
-                                    {syncing ? 'Syncing...' : 'Sync Now'}
-                                </button>
-                                <button 
-                                    onClick={onDisconnect} 
-                                    className="btn btn-secondary"
-                                    style={{ padding: '6px 12px', color: 'var(--color-danger)' }}
-                                >
-                                    Disconnect
-                                </button>
-                            </>
-                        )}
-                        
-                        {!connected && (
-                            <button onClick={onConnect} className="btn btn-primary" style={{ padding: '6px 12px' }}>
-                                Connect Navigator
-                            </button>
-                        )}
-                    </div>
-                    
-                    {syncing && (
-                        <div style={{ marginTop: '12px' }}>
-                            <div className="progress-bar">
-                                <div className="progress-fill" style={{ width: `${syncProgress}%` }}></div>
-                            </div>
-                            <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginTop: '4px' }}>
-                                {syncProgress}% complete
-                            </div>
-                        </div>
-                    )}
-                </div>
-            );
-        }
+    }
+};
 
         function ConnectPrompt({ onConnect }) {
             return (
