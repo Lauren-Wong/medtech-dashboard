@@ -156,10 +156,11 @@ class NavigatorAPIServiceImplicit {
         }
         
         try {
-            // For demo: Use mock data since Navigator API might not be accessible
-            // In production with real Navigator access, uncomment the fetch code below
+            console.log('Attempting to fetch agreements from Navigator API...');
+            console.log('API URL:', this.navigatorURL);
+            console.log('Access Token:', this.accessToken ? 'Present' : 'Missing');
             
-            /*
+            // Try to fetch from Navigator API
             const response = await fetch(`${this.navigatorURL}/agreements`, {
                 headers: {
                     'Authorization': `Bearer ${this.accessToken}`,
@@ -167,18 +168,29 @@ class NavigatorAPIServiceImplicit {
                 }
             });
             
+            console.log('Navigator API Response Status:', response.status);
+            
             if (!response.ok) {
-                throw new Error(`Navigator API error: ${response.statusText}`);
+                const errorText = await response.text();
+                console.warn(`Navigator API error: ${response.status} ${response.statusText}`, errorText);
+                console.log('Falling back to sample data...');
+                return this.getSampleAgreements();
             }
             
             const data = await response.json();
-            return this.processAgreements(data.agreements || []);
-            */
+            console.log('Navigator API returned data:', data);
             
-            // For now, return sample agreements
-            return this.getSampleAgreements();
+            if (!data.agreements || data.agreements.length === 0) {
+                console.log('No agreements found in Navigator, using sample data');
+                return this.getSampleAgreements();
+            }
+            
+            console.log(`Successfully retrieved ${data.agreements.length} agreements from Navigator`);
+            return this.processAgreements(data.agreements);
+            
         } catch (error) {
             console.error('Get agreements error:', error);
+            console.log('Falling back to sample data...');
             // Fallback to sample data
             return this.getSampleAgreements();
         }
@@ -191,7 +203,7 @@ class NavigatorAPIServiceImplicit {
                 id: "AGR-001",
                 navigatorId: "nav_001",
                 navigatorUrl: "https://navigator-d.docusign.com/agreements/nav_001",
-                title: "Germany & Austria - Imaging Systems",
+                title: "Germany & Austria - Imaging Systems (Sample)",
                 executionDate: "2024-01-15",
                 effectiveDate: "2024-02-01",
                 expirationDate: "2027-01-31",
@@ -224,7 +236,7 @@ class NavigatorAPIServiceImplicit {
                 id: "AGR-002",
                 navigatorId: "nav_002",
                 navigatorUrl: "https://navigator-d.docusign.com/agreements/nav_002",
-                title: "UK & Ireland - Patient Monitoring",
+                title: "UK & Ireland - Patient Monitoring (Sample)",
                 executionDate: "2023-06-10",
                 effectiveDate: "2023-07-01",
                 expirationDate: "2025-06-30",
@@ -257,7 +269,7 @@ class NavigatorAPIServiceImplicit {
                 id: "AGR-003",
                 navigatorId: "nav_003",
                 navigatorUrl: "https://navigator-d.docusign.com/agreements/nav_003",
-                title: "Japan - Advanced Imaging & AI",
+                title: "Japan - Advanced Imaging & AI (Sample)",
                 executionDate: "2024-09-20",
                 effectiveDate: "2024-10-01",
                 expirationDate: "2028-09-30",
@@ -291,7 +303,7 @@ class NavigatorAPIServiceImplicit {
                 id: "AGR-004",
                 navigatorId: "nav_004",
                 navigatorUrl: "https://navigator-d.docusign.com/agreements/nav_004",
-                title: "Brazil - Ultrasound Systems",
+                title: "Brazil - Ultrasound Systems (Sample)",
                 executionDate: "2023-03-05",
                 effectiveDate: "2023-04-01",
                 expirationDate: "2025-03-31",
@@ -324,7 +336,7 @@ class NavigatorAPIServiceImplicit {
                 id: "AGR-005",
                 navigatorId: "nav_005",
                 navigatorUrl: "https://navigator-d.docusign.com/agreements/nav_005",
-                title: "Australia & New Zealand - Full Portfolio",
+                title: "Australia & New Zealand - Full Portfolio (Sample)",
                 executionDate: "2024-11-12",
                 effectiveDate: "2024-12-01",
                 expirationDate: "2027-11-30",
@@ -356,6 +368,119 @@ class NavigatorAPIServiceImplicit {
         ];
         
         return sampleData.map(agreement => this.calculateDerivedFields(agreement));
+    }
+    
+    // Process agreements from Navigator API
+    processAgreements(agreements) {
+        console.log('Processing agreements from Navigator API:', agreements);
+        return agreements.map(agreement => this.processAgreement(agreement));
+    }
+    
+    // Process single agreement from Navigator API
+    processAgreement(agreement) {
+        console.log('Processing individual agreement:', agreement);
+        
+        const customFields = agreement.customFields || {};
+        
+        const processed = {
+            id: agreement.id || agreement.agreementId || `agr-${Date.now()}`,
+            navigatorId: agreement.id,
+            navigatorUrl: agreement.documentUrl || agreement.viewUrl || agreement.url,
+            
+            // Core fields
+            title: customFields.agreementTitle || customFields.title || agreement.name || 'Untitled Agreement',
+            executionDate: customFields.executionDate || agreement.executionDate || agreement.createdDate,
+            effectiveDate: customFields.effectiveDate || agreement.effectiveDate || agreement.executionDate,
+            expirationDate: customFields.expirationDate || agreement.expirationDate || this.calculateExpirationDate(agreement),
+            status: agreement.status || 'Active',
+            
+            // Distributor info
+            distributorLegalName: customFields.distributorLegalName || customFields.distributorName || 'Unknown Distributor',
+            lineOfBusiness: customFields.lineOfBusiness || customFields.businessLine || '',
+            initialTermLength: customFields.initialTermLength || customFields.termLength || '',
+            
+            // Territory & Products
+            territoryCountries: this.parseMultiValue(customFields.territoryCountries || customFields.territories || customFields.territory),
+            productCategories: this.parseMultiValue(customFields.productCategories || customFields.products || customFields.product),
+            customerSegmentRestrictions: customFields.customerSegmentRestrictions || customFields.customerSegments || '',
+            
+            // Exclusivity
+            exclusivityStatus: customFields.exclusivityStatus || customFields.exclusivity || 'Non-Exclusive',
+            performanceBasedExclusivity: customFields.performanceBasedExclusivity || 'No',
+            exclusivityConversionTrigger: customFields.exclusivityConversionTrigger || '',
+            
+            // Financial terms
+            commitmentCurrency: customFields.commitmentCurrency || customFields.currency || 'USD',
+            discountMRI_CT: this.parseNumber(customFields.discountMRI_CT || customFields['discount-mri-ct']),
+            discountUltrasound: this.parseNumber(customFields.discountUltrasound || customFields['discount-ultrasound']),
+            discountPatientMonitoring: this.parseNumber(customFields.discountPatientMonitoring || customFields['discount-patient-monitoring']),
+            softwareRevenueShare: this.parseNumber(customFields.softwareRevenueShare || customFields.softwareShare),
+            priceCapIncrease: this.parseNumber(customFields.priceCapIncrease || customFields.priceCap),
+            
+            // Annual minimums
+            annualMinimums: this.parseAnnualMinimums(customFields.annualMinimums || customFields.minimums),
+            
+            // Performance
+            minimumPerformanceThreshold: this.parseNumber(customFields.minimumPerformanceThreshold || customFields.performanceThreshold) || 85,
+            currentPerformance: this.parseNumber(customFields.currentPerformance || customFields.performance) || 0,
+            
+            // Renewal terms
+            nonRenewalNoticeDays: this.parseNumber(customFields.nonRenewalNoticeDays || customFields.noticeDays) || 90,
+            
+            // Metadata
+            departmentsImpacted: customFields.departmentsImpacted || customFields.departments || ''
+        };
+        
+        return this.calculateDerivedFields(processed);
+    }
+    
+    // Helper to calculate expiration date if not provided
+    calculateExpirationDate(agreement) {
+        // If we have effective date and term length, calculate
+        if (agreement.effectiveDate && agreement.termLength) {
+            const effective = new Date(agreement.effectiveDate);
+            const years = parseInt(agreement.termLength) || 1;
+            effective.setFullYear(effective.getFullYear() + years);
+            return effective.toISOString().split('T')[0];
+        }
+        // Default to 1 year from now
+        const future = new Date();
+        future.setFullYear(future.getFullYear() + 1);
+        return future.toISOString().split('T')[0];
+    }
+    
+    // Parse multi-value fields
+    parseMultiValue(value) {
+        if (Array.isArray(value)) return value;
+        if (typeof value === 'string' && value) {
+            try {
+                const parsed = JSON.parse(value);
+                return Array.isArray(parsed) ? parsed : [value];
+            } catch {
+                return value.split(/[,;|]/).map(v => v.trim()).filter(Boolean);
+            }
+        }
+        return [];
+    }
+    
+    // Parse number fields
+    parseNumber(value) {
+        if (value === null || value === undefined || value === '') return null;
+        const num = parseFloat(value);
+        return isNaN(num) ? null : num;
+    }
+    
+    // Parse annual minimums
+    parseAnnualMinimums(value) {
+        if (Array.isArray(value)) return value;
+        if (typeof value === 'string' && value) {
+            try {
+                return JSON.parse(value);
+            } catch {
+                return [];
+            }
+        }
+        return [];
     }
     
     calculateDerivedFields(agreement) {
