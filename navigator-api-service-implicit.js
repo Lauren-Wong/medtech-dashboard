@@ -7,7 +7,7 @@
 class NavigatorAPIServiceImplicit {
     constructor() {
         this.baseURL = 'https://demo.docusign.net/restapi/v2.1';
-        this.navigatorURL = 'https://navigator-d.docusign.com/api/v1';
+        this.navigatorURL = 'https://api-d.docusign.com/v1';
         this.accessToken = null;
         this.accountId = null;
         this.cache = new Map();
@@ -156,12 +156,19 @@ class NavigatorAPIServiceImplicit {
         }
         
         try {
+            // Get account ID if we don't have it yet
+            if (!this.accountId) {
+                console.log('Getting account ID...');
+                await this.getUserInfo();
+            }
+            
             console.log('Attempting to fetch agreements from Navigator API...');
-            console.log('API URL:', this.navigatorURL);
+            console.log('API URL:', `${this.navigatorURL}/accounts/${this.accountId}/agreements`);
+            console.log('Account ID:', this.accountId);
             console.log('Access Token:', this.accessToken ? 'Present' : 'Missing');
             
-            // Try to fetch from Navigator API
-            const response = await fetch(`${this.navigatorURL}/agreements`, {
+            // Try to fetch from Navigator API with correct endpoint
+            const response = await fetch(`${this.navigatorURL}/accounts/${this.accountId}/agreements`, {
                 headers: {
                     'Authorization': `Bearer ${this.accessToken}`,
                     'Content-Type': 'application/json'
@@ -180,13 +187,21 @@ class NavigatorAPIServiceImplicit {
             const data = await response.json();
             console.log('Navigator API returned data:', data);
             
-            if (!data.agreements || data.agreements.length === 0) {
+            // Navigator API returns agreements array directly or in a wrapper
+            const agreementsList = data.agreements || data.items || data;
+            
+            if (!Array.isArray(agreementsList) || agreementsList.length === 0) {
                 console.log('No agreements found in Navigator, using sample data');
                 return this.getSampleAgreements();
             }
             
-            console.log(`Successfully retrieved ${data.agreements.length} agreements from Navigator`);
-            return this.processAgreements(data.agreements);
+            console.log(`Successfully retrieved ${agreementsList.length} agreements from Navigator`);
+            console.log('Fetching full details for each agreement...');
+            
+            // Fetch full details for each agreement
+            const detailedAgreements = await this.fetchAgreementDetails(agreementsList);
+            
+            return this.processAgreements(detailedAgreements);
             
         } catch (error) {
             console.error('Get agreements error:', error);
@@ -196,6 +211,60 @@ class NavigatorAPIServiceImplicit {
         }
     }
     
+    // Fetch full details for each agreement
+    async fetchAgreementDetails(agreementsList) {
+        const detailedAgreements = [];
+        
+        for (let i = 0; i < agreementsList.length; i++) {
+            const basicAgreement = agreementsList[i];
+            const agreementId = basicAgreement.id || basicAgreement.agreementId;
+            
+            if (!agreementId) {
+                console.warn('Agreement missing ID, skipping:', basicAgreement);
+                continue;
+            }
+            
+            try {
+                console.log(`Fetching details for agreement ${i + 1}/${agreementsList.length}: ${agreementId}`);
+                
+                const response = await fetch(
+                    `${this.navigatorURL}/accounts/${this.accountId}/agreements/${agreementId}`,
+                    {
+                        headers: {
+                            'Authorization': `Bearer ${this.accessToken}`,
+                            'Content-Type': 'application/json'
+                        }
+                    }
+                );
+                
+                if (response.ok) {
+                    const detailedAgreement = await response.json();
+                    console.log(`Got details for ${agreementId}:`, detailedAgreement);
+                    detailedAgreements.push(detailedAgreement);
+                } else {
+                    console.warn(`Failed to get details for ${agreementId}, status: ${response.status}`);
+                    // Use basic agreement data as fallback
+                    detailedAgreements.push(basicAgreement);
+                }
+                
+                // Add small delay to avoid rate limiting (50ms between requests)
+                await this.sleep(50);
+                
+            } catch (error) {
+                console.error(`Error fetching agreement ${agreementId}:`, error);
+                // Use basic agreement data as fallback
+                detailedAgreements.push(basicAgreement);
+            }
+        }
+        
+        return detailedAgreements;
+    }
+    
+    // Helper to add delay
+    sleep(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+    
     // Sample agreements for demo
     getSampleAgreements() {
         const sampleData = [
@@ -203,12 +272,12 @@ class NavigatorAPIServiceImplicit {
                 id: "AGR-001",
                 navigatorId: "nav_001",
                 navigatorUrl: "https://navigator-d.docusign.com/agreements/nav_001",
-                title: "Germany & Austria - Imaging Systems (Sample)",
+                title: "[SAMPLE] Germany & Austria - Imaging Systems",
                 executionDate: "2024-01-15",
                 effectiveDate: "2024-02-01",
                 expirationDate: "2027-01-31",
                 status: "Active",
-                distributorLegalName: "MedizinTechnik Deutschland GmbH",
+                distributorLegalName: "MedizinTechnik Deutschland GmbH [SAMPLE]",
                 lineOfBusiness: "Medical Imaging",
                 initialTermLength: "3 years",
                 territoryCountries: ["Germany", "Austria"],
@@ -236,12 +305,12 @@ class NavigatorAPIServiceImplicit {
                 id: "AGR-002",
                 navigatorId: "nav_002",
                 navigatorUrl: "https://navigator-d.docusign.com/agreements/nav_002",
-                title: "UK & Ireland - Patient Monitoring (Sample)",
+                title: "[SAMPLE] UK & Ireland - Patient Monitoring",
                 executionDate: "2023-06-10",
                 effectiveDate: "2023-07-01",
                 expirationDate: "2025-06-30",
                 status: "Active",
-                distributorLegalName: "BritMed Solutions Ltd.",
+                distributorLegalName: "BritMed Solutions Ltd. [SAMPLE]",
                 lineOfBusiness: "Patient Monitoring",
                 initialTermLength: "2 years",
                 territoryCountries: ["United Kingdom", "Ireland"],
@@ -269,12 +338,12 @@ class NavigatorAPIServiceImplicit {
                 id: "AGR-003",
                 navigatorId: "nav_003",
                 navigatorUrl: "https://navigator-d.docusign.com/agreements/nav_003",
-                title: "Japan - Advanced Imaging & AI (Sample)",
+                title: "[SAMPLE] Japan - Advanced Imaging & AI",
                 executionDate: "2024-09-20",
                 effectiveDate: "2024-10-01",
                 expirationDate: "2028-09-30",
                 status: "Active",
-                distributorLegalName: "NipponMed Technologies K.K.",
+                distributorLegalName: "NipponMed Technologies K.K. [SAMPLE]",
                 lineOfBusiness: "Medical Imaging",
                 initialTermLength: "4 years",
                 territoryCountries: ["Japan"],
@@ -303,12 +372,12 @@ class NavigatorAPIServiceImplicit {
                 id: "AGR-004",
                 navigatorId: "nav_004",
                 navigatorUrl: "https://navigator-d.docusign.com/agreements/nav_004",
-                title: "Brazil - Ultrasound Systems (Sample)",
+                title: "[SAMPLE] Brazil - Ultrasound Systems",
                 executionDate: "2023-03-05",
                 effectiveDate: "2023-04-01",
                 expirationDate: "2025-03-31",
                 status: "Active",
-                distributorLegalName: "MedSul Distribuidora Ltda.",
+                distributorLegalName: "MedSul Distribuidora Ltda. [SAMPLE]",
                 lineOfBusiness: "Medical Imaging",
                 initialTermLength: "2 years",
                 territoryCountries: ["Brazil"],
@@ -336,12 +405,12 @@ class NavigatorAPIServiceImplicit {
                 id: "AGR-005",
                 navigatorId: "nav_005",
                 navigatorUrl: "https://navigator-d.docusign.com/agreements/nav_005",
-                title: "Australia & New Zealand - Full Portfolio (Sample)",
+                title: "[SAMPLE] Australia & New Zealand - Full Portfolio",
                 executionDate: "2024-11-12",
                 effectiveDate: "2024-12-01",
                 expirationDate: "2027-11-30",
                 status: "Active",
-                distributorLegalName: "AusMed Healthcare Solutions Pty Ltd",
+                distributorLegalName: "AusMed Healthcare Solutions Pty Ltd [SAMPLE]",
                 lineOfBusiness: "Medical Equipment",
                 initialTermLength: "3 years",
                 territoryCountries: ["Australia", "New Zealand"],
