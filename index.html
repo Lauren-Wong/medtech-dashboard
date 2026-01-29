@@ -14,7 +14,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     
     <!-- Include Navigator API Service -->
-    <script src="navigator-api-service.js"></script>
+    <script src="/medtech-dashboard/navigator-api-service-pkce.js"></script>
     
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -193,7 +193,7 @@
         const { useState, useEffect } = React;
         
         // Initialize Navigator Service
-        const navigatorService = new NavigatorAPIService();
+        const navigatorService = new NavigatorAPIServicePKCE();
         
         // Configuration (in production, these would come from environment variables)
         const DOCUSIGN_CONFIG = {
@@ -242,17 +242,16 @@
             }, []);
 
             const handleConnect = () => {
-                navigatorService.initiateOAuth(DOCUSIGN_CONFIG.clientId, DOCUSIGN_CONFIG.redirectUri);
+                navigatorService.initiateOAuthPKCE(DOCUSIGN_CONFIG.clientId, DOCUSIGN_CONFIG.redirectUri);
             };
 
             const handleOAuthCallback = async (code) => {
-                const result = await navigatorService.exchangeCodeForToken(
+                const result = await navigatorService.exchangeCodeForTokenPKCE(
                     code,
                     DOCUSIGN_CONFIG.clientId,
-                    DOCUSIGN_CONFIG.clientSecret,
                     DOCUSIGN_CONFIG.redirectUri
                 );
-                
+
                 if (result.success) {
                     setConnected(true);
                     setShowConnectModal(false);
