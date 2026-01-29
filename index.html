@@ -14,7 +14,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     
     <!-- Include Navigator API Service -->
-    <script src="/medtech-dashboard/navigator-api-service-implicit.js"></script>
+    <script src="./navigator-api-service-implicit.js"></script>
     
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -531,7 +531,7 @@
         function KPICard({ title, value, icon, warning }) {
             return (
                 <div className="card" style={{ padding: '24px', position: 'relative' }}>
-                    <div style={{ fontSize: '2rem', opacity: 0.2', position: 'absolute', right: '16px', top: '16px' }}>
+                    <div style={{ fontSize: '2rem', opacity: 0.2, position: 'absolute', right: '16px', top: '16px' }}>
                         {icon}
                     </div>
                     <div style={{ fontSize: '0.75rem', fontWeight: '600', textTransform: 'uppercase', color: 'var(--color-text-muted)', marginBottom: '8px' }}>
