@@ -5,8 +5,8 @@
 
 class NavigatorAPIServicePKCE {
     constructor() {
-        this.baseURL = 'https://api.docusign.com/v2.1';
-        this.navigatorURL = 'https://navigator.docusign.com/api/v1';
+        this.baseURL = 'https://demo.docusign.net/restapi/v2.1';
+        this.navigatorURL = 'https://navigator-d.docusign.com/api/v1';  // Demo Navigator
         this.accessToken = null;
         this.refreshToken = null;
         this.accountId = null;
@@ -60,7 +60,7 @@ class NavigatorAPIServicePKCE {
         const state = this.generateRandomString(32);
         sessionStorage.setItem('oauth_state', state);
         
-        const authURL = 'https://account.docusign.com/oauth/auth';
+        const authURL = 'https://account-d.docusign.com/oauth/auth';
         const params = new URLSearchParams({
             response_type: 'code',
             scope: 'signature navigator_read',
@@ -83,7 +83,7 @@ class NavigatorAPIServicePKCE {
                 throw new Error('Code verifier not found. Please restart the OAuth flow.');
             }
             
-            const response = await fetch('https://account.docusign.com/oauth/token', {
+            const response = await fetch('https://account-d.docusign.com/oauth/token', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded'
@@ -128,7 +128,7 @@ class NavigatorAPIServicePKCE {
     // Refresh access token (PKCE - no client secret!)
     async refreshAccessTokenPKCE(clientId) {
         try {
-            const response = await fetch('https://account.docusign.com/oauth/token', {
+            const response = await fetch('https://account-d.docusign.com/oauth/token', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded'
@@ -208,7 +208,7 @@ class NavigatorAPIServicePKCE {
     
     // Get user info and account ID
     async getUserInfo() {
-        const response = await fetch('https://account.docusign.com/oauth/userinfo', {
+        const response = await fetch('https://account-d.docusign.com/oauth/userinfo', {
             headers: {
                 'Authorization': `Bearer ${this.accessToken}`
             }
