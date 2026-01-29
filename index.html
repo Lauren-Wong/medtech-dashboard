@@ -14,7 +14,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     
     <!-- Include Navigator API Service -->
-    <script src="/medtech-dashboard/navigator-api-service-pkce.js"></script>
+    <script src="/medtech-dashboard/navigator-api-service-implicit.js"></script>
     
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -193,14 +193,14 @@
         const { useState, useEffect } = React;
         
         // Initialize Navigator Service
-        const navigatorService = new NavigatorAPIServicePKCE();
+        const navigatorService = new NavigatorAPIServiceImplicit();
         
         // Configuration (in production, these would come from environment variables)
         const DOCUSIGN_CONFIG = {
             clientId: '702abe75-377f-4698-8eb6-b3748d8694b2',
             // No client secret needed for PKCE!
             redirectUri: 'https://lauren-wong.github.io/medtech-dashboard/',
-            usePKCE: true  // Enable PKCE flow
+            useImplicit: true  // Changed from usePKCE
         };
 
         function Dashboard() {
@@ -234,32 +234,29 @@
 
             // Handle OAuth callback
             useEffect(() => {
-                const params = new URLSearchParams(window.location.search);
-                const code = params.get('code');
-                if (code) {
-                    handleOAuthCallback(code);
+                // Check for OAuth callback (implicit grant uses hash, not query params)
+                if (window.location.hash && window.location.hash.includes('access_token')) {
+                    handleOAuthCallback();
                 }
             }, []);
 
             const handleConnect = () => {
-                navigatorService.initiateOAuthPKCE(DOCUSIGN_CONFIG.clientId, DOCUSIGN_CONFIG.redirectUri);
+                navigatorService.initiateOAuthImplicit(DOCUSIGN_CONFIG.clientId, DOCUSIGN_CONFIG.redirectUri);
             };
 
-            const handleOAuthCallback = async (code) => {
-                const result = await navigatorService.exchangeCodeForTokenPKCE(
-                    code,
-                    DOCUSIGN_CONFIG.clientId,
-                    DOCUSIGN_CONFIG.redirectUri
-                );
+            const handleOAuthCallback = () => {
+                const result = navigatorService.handleOAuthCallback();
 
                 if (result.success) {
                     setConnected(true);
                     setShowConnectModal(false);
-                    // Clear code from URL
+
+                    // Clear hash from URL
                     window.history.replaceState({}, document.title, window.location.pathname);
+
                     // Trigger initial sync
                     handleSync();
-                } else {
+                } else if (result.error) {
                     alert('Connection failed: ' + result.error);
                 }
             };
