@@ -199,6 +199,7 @@
         const DOCUSIGN_CONFIG = {
             clientId: '702abe75-377f-4698-8eb6-b3748d8694b2',
             redirectUri: 'https://laurenwong.dev/medtech-dashboard/',
+            accountId: '8e4c2171-bae4-4593-adb5-f6b171813f70',  // ← ADD YOUR CORRECT ACCOUNT ID
             useImplicit: true
         };
 
@@ -244,8 +245,14 @@
 
             const handleOAuthCallback = () => {
                 const result = navigatorService.handleOAuthCallback();
-                
+
                 if (result.success) {
+                    // Override account ID with the one from config
+                    if (DOCUSIGN_CONFIG.accountId) {
+                        navigatorService.accountId = DOCUSIGN_CONFIG.accountId;
+                        console.log('Using configured Navigator account ID:', DOCUSIGN_CONFIG.accountId);
+                    }
+
                     setConnected(true);
                     setShowConnectModal(false);
                     window.history.replaceState({}, document.title, window.location.pathname);
