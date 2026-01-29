@@ -26,7 +26,7 @@ class NavigatorAPIServiceImplicit {
         const authURL = 'https://account-d.docusign.com/oauth/auth';
         const params = new URLSearchParams({
             response_type: 'token',  // Implicit grant uses 'token' not 'code'
-            scope: 'signature extended',
+            scope: 'signature extended adm_store_unified_repo_read models_read public_dms_document_read',
             client_id: clientId,
             redirect_uri: redirectUri,
             state: state
