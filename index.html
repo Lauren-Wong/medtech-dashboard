@@ -197,9 +197,10 @@
         
         // Configuration (in production, these would come from environment variables)
         const DOCUSIGN_CONFIG = {
-            clientId: 'YOUR_CLIENT_ID', // Replace with actual client ID
-            clientSecret: 'YOUR_CLIENT_SECRET', // Replace with actual client secret
-            redirectUri: window.location.origin + '/oauth/callback'
+            clientId: '702abe75-377f-4698-8eb6-b3748d8694b2',
+            // No client secret needed for PKCE!
+            redirectUri: 'https://lauren-wong.github.io/medtech-dashboard/',
+            usePKCE: true  // Enable PKCE flow
         };
 
         function Dashboard() {
