@@ -195,12 +195,11 @@
         // Initialize Navigator Service
         const navigatorService = new NavigatorAPIServiceImplicit();
         
-        // Configuration (in production, these would come from environment variables)
+        // Configuration
         const DOCUSIGN_CONFIG = {
             clientId: '702abe75-377f-4698-8eb6-b3748d8694b2',
-            // No client secret needed for PKCE!
-            redirectUri: 'https://lauren-wong.github.io/medtech-dashboard/',
-            useImplicit: true  // Changed from usePKCE
+            redirectUri: 'https://laurenwong.dev/medtech-dashboard/',
+            useImplicit: true
         };
 
         function Dashboard() {
@@ -223,7 +222,7 @@
                 const cached = navigatorService.getCachedAgreements();
                 if (cached.length > 0) {
                     setAgreements(cached);
-                    setConnected(true);
+                    setConnected(navigatorService.isAuthenticated());
                     setLastSync(navigatorService.getLastSyncTime());
                 }
                 const cachedConflicts = navigatorService.getCachedConflicts();
@@ -234,7 +233,6 @@
 
             // Handle OAuth callback
             useEffect(() => {
-                // Check for OAuth callback (implicit grant uses hash, not query params)
                 if (window.location.hash && window.location.hash.includes('access_token')) {
                     handleOAuthCallback();
                 }
@@ -246,101 +244,525 @@
 
             const handleOAuthCallback = () => {
                 const result = navigatorService.handleOAuthCallback();
-
+                
                 if (result.success) {
                     setConnected(true);
                     setShowConnectModal(false);
-
-                    // Clear hash from URL
                     window.history.replaceState({}, document.title, window.location.pathname);
-
-                    // Trigger initial sync
                     handleSync();
                 } else if (result.error) {
                     alert('Connection failed: ' + result.error);
                 }
             };
 
-const handleSync = async () => {
-    if (syncing) return;
-    
-    setSyncing(true);
-    setSyncProgress(0);
-    
-    const result = await navigatorService.syncAgreements((progress) => {
-        setSyncProgress(progress.progress || 0);
-    });
-    
-    setSyncing(false);
-    
-    if (result.success) {
-        const agreements = navigatorService.getCachedAgreements();
-        setAgreements(agreements);
-        const cachedConflicts = navigatorService.getCachedConflicts();
-        setConflicts(cachedConflicts);
-        setLastSync(result.lastSyncTime);
-    } else {
-        alert('Sync failed: ' + result.error);
-    }
-};
+            const handleSync = async () => {
+                if (syncing) return;
+                
+                setSyncing(true);
+                setSyncProgress(0);
+                
+                const result = await navigatorService.syncAgreements((progress) => {
+                    setSyncProgress(progress.progress || 0);
+                });
+                
+                setSyncing(false);
+                
+                if (result.success) {
+                    const agreements = navigatorService.getCachedAgreements();
+                    setAgreements(agreements);
+                    const cachedConflicts = navigatorService.getCachedConflicts();
+                    setConflicts(cachedConflicts);
+                    setLastSync(result.lastSyncTime);
+                } else {
+                    alert('Sync failed: ' + result.error);
+                }
+            };
 
-        // Simulate AI response using MCP tools
+            const handleDisconnect = () => {
+                if (confirm('Are you sure you want to disconnect from Navigator? All cached data will be cleared.')) {
+                    navigatorService.disconnect();
+                    setConnected(false);
+                    setAgreements([]);
+                    setConflicts([]);
+                    setLastSync(null);
+                    setMessages([
+                        { role: 'assistant', content: 'Disconnected from Navigator. Connect again to access your agreements.' }
+                    ]);
+                }
+            };
+
+            const addMessage = (role, content) => {
+                setMessages(prev => [...prev, { role, content }]);
+            };
+
+            const handleSend = async () => {
+                if (!input.trim()) return;
+                
+                const userMsg = input;
+                addMessage('user', userMsg);
+                setInput('');
+                
+                const response = await simulateAIResponse(userMsg, agreements);
+                addMessage('assistant', response);
+            };
+
+            const kpis = {
+                active: agreements.filter(a => a.status === 'Active').length,
+                territories: [...new Set(agreements.flatMap(a => a.territoryCountries))].length,
+                expiring: agreements.filter(a => a.daysUntilExpiration <= 90 && a.daysUntilExpiration > 0).length,
+                commitment: agreements.reduce((sum, a) => sum + (a.currentYearCommitment || 0), 0)
+            };
+
+            return (
+                <div style={{ display: 'flex' }}>
+                    <Sidebar view={view} setView={setView} />
+                    <div className="main-content" style={{ paddingRight: chatOpen ? '432px' : '32px' }}>
+                        <Header 
+                            connected={connected}
+                            syncing={syncing}
+                            syncProgress={syncProgress}
+                            lastSync={lastSync}
+                            onConnect={() => setShowConnectModal(true)}
+                            onSync={handleSync}
+                            onDisconnect={handleDisconnect}
+                            onChatToggle={() => setChatOpen(!chatOpen)}
+                            chatOpen={chatOpen}
+                        />
+                        
+                        {!connected ? (
+                            <ConnectPrompt onConnect={() => setShowConnectModal(true)} />
+                        ) : (
+                            <>
+                                {view === 'dashboard' && <DashboardView kpis={kpis} data={agreements} conflicts={conflicts} />}
+                                {view === 'agreements' && <AgreementsView data={agreements} />}
+                                {view === 'analytics' && <AnalyticsView data={agreements} />}
+                            </>
+                        )}
+                    </div>
+                    <ChatPanel 
+                        open={chatOpen} 
+                        messages={messages} 
+                        input={input}
+                        setInput={setInput}
+                        onSend={handleSend}
+                        onClose={() => setChatOpen(false)}
+                        connected={connected}
+                    />
+                    
+                    {showConnectModal && (
+                        <ConnectModal 
+                            onConnect={handleConnect}
+                            onClose={() => setShowConnectModal(false)}
+                        />
+                    )}
+                </div>
+            );
+        }
+
+        function Sidebar({ view, setView }) {
+            const items = [
+                { id: 'dashboard', label: 'Dashboard', icon: '📊' },
+                { id: 'agreements', label: 'Agreements', icon: '📄' },
+                { id: 'analytics', label: 'Analytics', icon: '📈' }
+            ];
+            
+            return (
+                <div className="sidebar">
+                    <div style={{ padding: '24px', borderBottom: '1px solid var(--color-border)' }}>
+                        <div style={{ fontSize: '1.5rem', fontWeight: '700', color: 'var(--color-primary)' }}>
+                            Fontara Medical
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
+                            Distributor Dashboard
+                        </div>
+                    </div>
+                    <nav style={{ padding: '16px 0' }}>
+                        {items.map(item => (
+                            <div
+                                key={item.id}
+                                onClick={() => setView(item.id)}
+                                style={{
+                                    padding: '12px 24px',
+                                    cursor: 'pointer',
+                                    fontWeight: view === item.id ? '600' : '400',
+                                    color: view === item.id ? 'var(--color-primary)' : 'var(--color-text-muted)',
+                                    background: view === item.id ? 'var(--color-bg)' : 'transparent',
+                                    borderLeft: view === item.id ? '3px solid var(--color-primary)' : '3px solid transparent'
+                                }}
+                            >
+                                {item.icon} {item.label}
+                            </div>
+                        ))}
+                    </nav>
+                </div>
+            );
+        }
+
+        function Header({ connected, syncing, syncProgress, lastSync, onConnect, onSync, onDisconnect, onChatToggle, chatOpen }) {
+            return (
+                <div style={{ marginBottom: '32px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                        <div>
+                            <h1 style={{ fontSize: '2rem', fontWeight: '700' }}>Agreement Dashboard</h1>
+                        </div>
+                        <button onClick={onChatToggle} className="btn btn-primary">
+                            🤖 {chatOpen ? 'Close' : 'Open'} AI Assistant
+                        </button>
+                    </div>
+                    
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+                        <div className={`connection-status ${connected ? 'connected' : 'disconnected'}`}>
+                            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: connected ? '#059669' : '#DC2626' }}></span>
+                            {connected ? 'Connected to Navigator' : 'Not Connected'}
+                        </div>
+                        
+                        {connected && lastSync && (
+                            <div className="mono" style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)' }}>
+                                Last sync: {new Date(lastSync).toLocaleString()}
+                            </div>
+                        )}
+                        
+                        {connected && (
+                            <>
+                                <button 
+                                    onClick={onSync} 
+                                    className="btn btn-secondary"
+                                    disabled={syncing}
+                                    style={{ padding: '6px 12px' }}
+                                >
+                                    <span className={syncing ? 'spinning' : ''}>🔄</span>
+                                    {syncing ? 'Syncing...' : 'Sync Now'}
+                                </button>
+                                <button 
+                                    onClick={onDisconnect} 
+                                    className="btn btn-secondary"
+                                    style={{ padding: '6px 12px', color: 'var(--color-danger)' }}
+                                >
+                                    Disconnect
+                                </button>
+                            </>
+                        )}
+                        
+                        {!connected && (
+                            <button onClick={onConnect} className="btn btn-primary" style={{ padding: '6px 12px' }}>
+                                Connect Navigator
+                            </button>
+                        )}
+                    </div>
+                    
+                    {syncing && (
+                        <div style={{ marginTop: '12px' }}>
+                            <div className="progress-bar">
+                                <div className="progress-fill" style={{ width: `${syncProgress}%` }}></div>
+                            </div>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginTop: '4px' }}>
+                                {syncProgress}% complete
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        function ConnectPrompt({ onConnect }) {
+            return (
+                <div className="card animate-in" style={{ padding: '48px', textAlign: 'center', maxWidth: '600px', margin: '64px auto' }}>
+                    <div style={{ fontSize: '4rem', marginBottom: '24px' }}>🔗</div>
+                    <h2 style={{ fontSize: '1.5rem', fontWeight: '700', marginBottom: '16px' }}>
+                        Connect to DocuSign Navigator
+                    </h2>
+                    <p style={{ color: 'var(--color-text-muted)', marginBottom: '32px', lineHeight: '1.6' }}>
+                        Connect your DocuSign Navigator account to view and analyze your distributor agreements.
+                    </p>
+                    <button onClick={onConnect} className="btn btn-primary" style={{ fontSize: '1rem', padding: '12px 24px' }}>
+                        Connect Navigator Account
+                    </button>
+                </div>
+            );
+        }
+
+        function ConnectModal({ onConnect, onClose }) {
+            return (
+                <div className="modal" onClick={onClose}>
+                    <div className="modal-content" onClick={e => e.stopPropagation()}>
+                        <h2 style={{ fontSize: '1.5rem', fontWeight: '700', marginBottom: '16px' }}>
+                            Connect to Navigator
+                        </h2>
+                        <p style={{ color: 'var(--color-text-muted)', marginBottom: '24px' }}>
+                            You'll be redirected to DocuSign to authorize this application.
+                        </p>
+                        <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                            <button onClick={onClose} className="btn btn-secondary">
+                                Cancel
+                            </button>
+                            <button onClick={onConnect} className="btn btn-primary">
+                                Continue to DocuSign
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        function DashboardView({ kpis, data, conflicts }) {
+            return (
+                <div className="animate-in">
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '20px', marginBottom: '32px' }}>
+                        <KPICard title="Active Agreements" value={kpis.active} icon="✅" />
+                        <KPICard title="Territories Covered" value={kpis.territories} icon="🌍" />
+                        <KPICard title="Expiring in 90 Days" value={kpis.expiring} icon="⚠️" warning={kpis.expiring > 0} />
+                        <KPICard title="Total Commitment" value={`$${(kpis.commitment/1000000).toFixed(1)}M`} icon="💰" />
+                    </div>
+                    
+                    <div className="card" style={{ padding: '24px', marginBottom: '24px' }}>
+                        <h2 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '16px' }}>
+                            Recent Agreements
+                        </h2>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px' }}>
+                            {data.slice(0, 6).map(agreement => (
+                                <AgreementCard key={agreement.id} agreement={agreement} />
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        function KPICard({ title, value, icon, warning }) {
+            return (
+                <div className="card" style={{ padding: '24px', position: 'relative' }}>
+                    <div style={{ fontSize: '2rem', opacity: 0.2', position: 'absolute', right: '16px', top: '16px' }}>
+                        {icon}
+                    </div>
+                    <div style={{ fontSize: '0.75rem', fontWeight: '600', textTransform: 'uppercase', color: 'var(--color-text-muted)', marginBottom: '8px' }}>
+                        {title}
+                    </div>
+                    <div style={{ fontSize: '2rem', fontWeight: '700', color: 'var(--color-primary)' }}>
+                        {value}
+                    </div>
+                    {warning && (
+                        <div style={{ fontSize: '0.75rem', color: 'var(--color-warning)', marginTop: '4px' }}>
+                            ⚠️ Requires attention
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        function AgreementCard({ agreement }) {
+            return (
+                <div className="card" style={{ padding: '16px' }}>
+                    <div style={{ fontWeight: '600', marginBottom: '8px' }}>{agreement.title}</div>
+                    <div style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)', marginBottom: '8px' }}>
+                        {agreement.distributorLegalName}
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' }}>
+                        <span className={`badge badge-${agreement.exclusivityStatus.toLowerCase().replace(' ', '-')}`}>
+                            {agreement.exclusivityStatus}
+                        </span>
+                        <span className={`badge badge-${agreement.aiRiskScore.toLowerCase()}`}>
+                            {agreement.aiRiskScore}
+                        </span>
+                    </div>
+                    {agreement.navigatorUrl && (
+                        <a href={agreement.navigatorUrl} target="_blank" className="btn btn-secondary" style={{ width: '100%', justifyContent: 'center', fontSize: '0.75rem', padding: '8px' }}>
+                            View in Navigator →
+                        </a>
+                    )}
+                </div>
+            );
+        }
+
+        function AgreementsView({ data }) {
+            return (
+                <div className="animate-in">
+                    <h2 style={{ fontSize: '1.5rem', fontWeight: '700', marginBottom: '24px' }}>
+                        All Agreements ({data.length})
+                    </h2>
+                    <div className="card" style={{ overflow: 'hidden' }}>
+                        <table style={{ width: '100%' }}>
+                            <thead>
+                                <tr style={{ background: 'var(--color-bg)' }}>
+                                    <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', textTransform: 'uppercase' }}>Agreement</th>
+                                    <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', textTransform: 'uppercase' }}>Territory</th>
+                                    <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', textTransform: 'uppercase' }}>Exclusivity</th>
+                                    <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', textTransform: 'uppercase' }}>Performance</th>
+                                    <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', textTransform: 'uppercase' }}>Risk</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {data.map(item => (
+                                    <tr key={item.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
+                                        <td style={{ padding: '16px' }}>
+                                            <div style={{ fontWeight: '600' }}>{item.distributorLegalName}</div>
+                                            <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>{item.title}</div>
+                                        </td>
+                                        <td style={{ padding: '16px' }}>
+                                            {item.territoryCountries.slice(0, 2).map(t => (
+                                                <span key={t} className="badge" style={{ background: 'var(--color-bg)', color: 'var(--color-text)', marginRight: '4px' }}>
+                                                    {t}
+                                                </span>
+                                            ))}
+                                        </td>
+                                        <td style={{ padding: '16px' }}>
+                                            <span className={`badge badge-${item.exclusivityStatus.toLowerCase().replace(' ', '-')}`}>
+                                                {item.exclusivityStatus}
+                                            </span>
+                                        </td>
+                                        <td style={{ padding: '16px' }}>
+                                            <div style={{ fontSize: '1rem', fontWeight: '600' }}>{item.currentPerformance}%</div>
+                                        </td>
+                                        <td style={{ padding: '16px' }}>
+                                            <span className={`badge badge-${item.aiRiskScore.toLowerCase()}`}>{item.aiRiskScore}</span>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            );
+        }
+
+        function AnalyticsView({ data }) {
+            return (
+                <div className="animate-in">
+                    <h2 style={{ fontSize: '1.5rem', fontWeight: '700', marginBottom: '24px' }}>Analytics</h2>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+                        <div className="card" style={{ padding: '24px' }}>
+                            <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '16px' }}>
+                                Performance Distribution
+                            </h3>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                <PerformanceBar label="Above 100%" count={data.filter(a => a.currentPerformance >= 100).length} total={data.length} color="var(--color-success)" />
+                                <PerformanceBar label="90-100%" count={data.filter(a => a.currentPerformance >= 90 && a.currentPerformance < 100).length} total={data.length} color="var(--color-secondary)" />
+                                <PerformanceBar label="85-90%" count={data.filter(a => a.currentPerformance >= 85 && a.currentPerformance < 90).length} total={data.length} color="var(--color-warning)" />
+                                <PerformanceBar label="Below 85%" count={data.filter(a => a.currentPerformance < 85).length} total={data.length} color="var(--color-danger)" />
+                            </div>
+                        </div>
+                        
+                        <div className="card" style={{ padding: '24px' }}>
+                            <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '16px' }}>
+                                Risk Distribution
+                            </h3>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                <PerformanceBar label="Low Risk" count={data.filter(a => a.aiRiskScore === 'Low').length} total={data.length} color="var(--color-success)" />
+                                <PerformanceBar label="Medium Risk" count={data.filter(a => a.aiRiskScore === 'Medium').length} total={data.length} color="var(--color-warning)" />
+                                <PerformanceBar label="High Risk" count={data.filter(a => a.aiRiskScore === 'High').length} total={data.length} color="var(--color-danger)" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        function PerformanceBar({ label, count, total, color }) {
+            const percentage = total > 0 ? (count / total) * 100 : 0;
+            return (
+                <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: '0.875rem' }}>
+                        <span>{label}</span>
+                        <span style={{ fontWeight: '600' }}>{count} ({percentage.toFixed(0)}%)</span>
+                    </div>
+                    <div className="progress-bar" style={{ height: '8px' }}>
+                        <div style={{ width: `${percentage}%`, height: '100%', background: color, borderRadius: '2px' }}></div>
+                    </div>
+                </div>
+            );
+        }
+
+        function ChatPanel({ open, messages, input, setInput, onSend, onClose, connected }) {
+            return (
+                <div className={`chat-panel ${open ? 'open' : ''}`}>
+                    <div style={{ padding: '24px', borderBottom: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                            <div style={{ fontWeight: '700', fontSize: '1.125rem' }}>🤖 AI Assistant</div>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
+                                {connected ? 'Connected' : 'Not connected'}
+                            </div>
+                        </div>
+                        <button onClick={onClose} className="btn btn-secondary" style={{ padding: '8px' }}>✕</button>
+                    </div>
+                    
+                    <div style={{ flex: 1, overflowY: 'auto', padding: '24px' }}>
+                        {messages.map((msg, i) => (
+                            <div key={i} style={{ 
+                                marginBottom: '16px', 
+                                display: 'flex', 
+                                justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start'
+                            }}>
+                                <div style={{ 
+                                    maxWidth: '80%', 
+                                    padding: '12px 16px', 
+                                    borderRadius: '12px',
+                                    background: msg.role === 'user' ? 'var(--color-primary)' : 'var(--color-bg)',
+                                    color: msg.role === 'user' ? 'white' : 'var(--color-text)',
+                                    whiteSpace: 'pre-wrap'
+                                }}>
+                                    {msg.content}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                    
+                    <div style={{ padding: '16px', borderTop: '1px solid var(--color-border)' }}>
+                        {connected ? (
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                                <input
+                                    type="text"
+                                    value={input}
+                                    onChange={(e) => setInput(e.target.value)}
+                                    onKeyPress={(e) => e.key === 'Enter' && onSend()}
+                                    placeholder="Ask about agreements..."
+                                    style={{ 
+                                        flex: 1, 
+                                        padding: '10px', 
+                                        borderRadius: '8px', 
+                                        border: '1px solid var(--color-border)',
+                                        outline: 'none'
+                                    }}
+                                />
+                                <button onClick={onSend} className="btn btn-primary">Send</button>
+                            </div>
+                        ) : (
+                            <div style={{ textAlign: 'center', padding: '16px', color: 'var(--color-text-muted)' }}>
+                                Connect to Navigator to use AI assistant
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        // Simulate AI response
         async function simulateAIResponse(query, agreements) {
             const q = query.toLowerCase();
             
-            // Simulate navigator_search_agreements tool
             if (q.includes('expir') || q.includes('renew')) {
                 const expiring = agreements.filter(a => a.daysUntilExpiration <= 180 && a.daysUntilExpiration > 0);
-                if (expiring.length === 0) {
-                    return 'No agreements expiring in the next 6 months.';
-                }
+                if (expiring.length === 0) return 'No agreements expiring in the next 6 months.';
                 return `I found ${expiring.length} agreements expiring in the next 6 months:\n\n${expiring.map(a => 
-                    `• ${a.title} (${a.territoryCountries[0]}): ${a.daysUntilExpiration} days until expiration\n  Renewal deadline: ${a.nonRenewalDeadline} (${a.daysUntilDeadline} days)`
-                ).join('\n\n')}\n\nWould you like details on any of these?`;
+                    `• ${a.title} (${a.territoryCountries[0]}): ${a.daysUntilExpiration} days`
+                ).join('\n')}`;
             }
             
-            // Simulate navigator_get_agreement_status tool
-            if (q.includes('performance') || q.includes('threshold') || q.includes('below')) {
+            if (q.includes('performance') || q.includes('threshold')) {
                 const low = agreements.filter(a => a.currentPerformance < a.minimumPerformanceThreshold);
-                if (low.length === 0) {
-                    return '✅ All agreements are meeting or exceeding performance thresholds!';
-                }
-                return `⚠️ Found ${low.length} agreement(s) below threshold:\n\n${low.map(a => 
-                    `• ${a.title}: ${a.currentPerformance}% (threshold: ${a.minimumPerformanceThreshold}%)\n  Risk: ${a.aiRiskScore}`
-                ).join('\n\n')}\n\nI recommend scheduling performance reviews for these distributors.`;
+                if (low.length === 0) return '✅ All agreements meeting thresholds!';
+                return `⚠️ ${low.length} agreement(s) below threshold:\n\n${low.map(a => 
+                    `• ${a.title}: ${a.currentPerformance}%`
+                ).join('\n')}`;
             }
             
-            // Simulate navigator_analyze_portfolio tool
-            if (q.includes('risk') || q.includes('alert') || q.includes('high risk')) {
+            if (q.includes('risk')) {
                 const high = agreements.filter(a => a.aiRiskScore === 'High');
-                if (high.length === 0) {
-                    return 'No high-risk agreements detected. All agreements are performing well.';
-                }
-                return `🚨 ${high.length} high-risk agreement(s) requiring attention:\n\n${high.map(a => 
-                    `• ${a.title}\n  Performance: ${a.currentPerformance}% | Expires in: ${a.daysUntilExpiration} days`
-                ).join('\n\n')}`;
+                if (high.length === 0) return 'No high-risk agreements.';
+                return `🚨 ${high.length} high-risk agreement(s):\n\n${high.map(a => 
+                    `• ${a.title}\n  Performance: ${a.currentPerformance}%`
+                ).join('\n')}`;
             }
             
-            // Simulate navigator_compare_agreements tool
-            if (q.includes('compare')) {
-                if (agreements.length >= 2) {
-                    const a1 = agreements[0];
-                    const a2 = agreements[1];
-                    return `Comparing ${a1.title} vs ${a2.title}:\n\nPerformance: ${a1.currentPerformance}% vs ${a2.currentPerformance}%\nExclusivity: ${a1.exclusivityStatus} vs ${a2.exclusivityStatus}\nRisk: ${a1.aiRiskScore} vs ${a2.aiRiskScore}\n\nWould you like more details?`;
-                }
-            }
-            
-            // Simulate navigator_get_document_link tool
-            if (q.includes('view') || q.includes('link') || q.includes('navigator')) {
-                const withLinks = agreements.filter(a => a.navigatorUrl);
-                if (withLinks.length > 0) {
-                    const a = withLinks[0];
-                    return `You can view ${a.title} in Navigator here: ${a.navigatorUrl}`;
-                }
-                return 'No Navigator document links available for these agreements.';
-            }
-            
-            return `I can help you analyze your ${agreements.length} distributor agreements. Try asking about:\n• Expiring agreements\n• Performance issues\n• Risk assessments\n• Territory comparisons\n• Specific agreement details`;
+            return `I can help analyze your ${agreements.length} agreements. Try asking about:\n• Expiring agreements\n• Performance issues\n• Risk assessments`;
         }
 
         ReactDOM.render(<Dashboard />, document.getElementById('root'));
